@@ -10,6 +10,16 @@ source_examples:
     fork_repo: "https://github.com/rh-ai-quickstart/nvidia-video-search-and-summarization"
     notes: "Demonstrates OpenShift Route creation with TLS edge termination for web UI access"
     approach: "A"
+  - blueprint: "data-flywheel"
+    source_repo: "https://github.com/NVIDIA-AI-Blueprints/data-flywheel"
+    fork_repo: "https://github.com/rh-ai-quickstart/nvidia-data-flywheel"
+    notes: "Multiple Routes for different services (API, MLflow, Kibana, Flower) with conditional creation"
+    approach: "A"
+  - blueprint: "generative-virtual-screening"
+    source_repo: "https://github.com/NVIDIA-BioNeMo-blueprints/generative-virtual-screening"
+    fork_repo: "https://github.com/rh-ai-quickstart/generative-virtual-screening"
+    notes: "Routes for 4 NIM services (MSA, OpenFold2, GenMol, DiffDock) using range-based template iteration"
+    approach: "A"
 ---
 
 # OpenShift Routes for External Access
@@ -526,18 +536,128 @@ spec:
 7. **Test Before Documenting**: Verify route works before publishing docs
 8. **Gate with Flags**: Use `openshift.route.enabled` for conditional creation
 
+## Multi-Service Route Pattern (from data-flywheel)
+
+When a blueprint has multiple web services (API, UI, monitoring tools), create separate Route files for each service with individual enable flags.
+
+### File Organization
+
+```
+templates/
+├── api-route.yaml
+├── mlflow-route.yaml
+├── kibana-route.yaml
+└── flower-route.yaml
+```
+
+### Per-Service Route Template
+
+Each Route file uses a multi-level conditional:
+
+```yaml
+{{- if and .Values.openshift.enabled .Values.openshift.routes.enabled .Values.openshift.routes.api.enabled .Values.foundationalFlywheelServer.deployments.api.enabled }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ .Values.foundationalFlywheelServer.deployments.api.fullnameOverride }}-route
+  labels:
+    app: {{ .Values.foundationalFlywheelServer.deployments.api.fullnameOverride }}-deployment
+spec:
+  {{- if .Values.openshift.routes.api.host }}
+  host: {{ .Values.openshift.routes.api.host }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{ .Values.foundationalFlywheelServer.deployments.api.fullnameOverride }}-service
+    weight: 100
+  port:
+    targetPort: {{ .Values.foundationalFlywheelServer.deployments.api.service.port }}
+  {{- if .Values.openshift.routes.api.tls.enabled }}
+  tls:
+    termination: {{ .Values.openshift.routes.api.tls.termination }}
+    insecureEdgeTerminationPolicy: {{ .Values.openshift.routes.api.tls.insecureEdgeTerminationPolicy }}
+  {{- end }}
+  wildcardPolicy: None
+{{- end }}
+```
+
+### Granular Values Configuration
+
+```yaml
+openshift:
+  enabled: true
+  routes:
+    enabled: true
+    api:
+      enabled: true
+      host: ""
+      tls:
+        enabled: true
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+    mlflow:
+      enabled: true
+      host: ""
+      tls:
+        enabled: true
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+    kibana:
+      enabled: true
+      host: ""
+      tls:
+        enabled: true
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+    flower:
+      enabled: true
+      host: ""
+      tls:
+        enabled: true
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+```
+
+### Benefits of This Pattern
+
+1. **Selective Exposure**: Enable/disable Routes per service without modifying templates
+2. **Production Readiness**: Disable non-production routes (flower, kibana) by setting `enabled: false`
+3. **Custom Hostnames**: Set different hosts for each service
+4. **Consistent TLS**: All routes use same TLS configuration by default
+
+### Production Deployment Example
+
+```yaml
+openshift:
+  enabled: true
+  routes:
+    enabled: true
+    api:
+      enabled: true
+      host: "api.example.com"
+    mlflow:
+      enabled: true
+      host: "mlflow.example.com"
+    kibana:
+      enabled: false  # Disable for production
+    flower:
+      enabled: false  # Disable for production
+```
+
 ## Conversion Checklist
 
 When adding OpenShift Routes to a blueprint:
 
 - [ ] Identify services that need external access
-- [ ] Create Route resource in `templates/openshift.yaml`
+- [ ] Decide: single Route file vs. per-service Route files
+- [ ] Create Route resource(s) in `templates/`
 - [ ] Configure edge TLS termination with HTTP redirect
 - [ ] Reference Service port by name (not number)
-- [ ] Add `openshift.route.enabled` flag to values
-- [ ] Gate Route creation behind `openshift.enabled`
-- [ ] Document how to retrieve route URL (`oc get route`)
+- [ ] Add per-service `openshift.routes.<service>.enabled` flags
+- [ ] Gate Route creation behind multiple conditions (openshift.enabled, routes.enabled, service.enabled)
+- [ ] Document how to retrieve route URLs (`oc get routes`)
 - [ ] Update README to replace port-forward instructions with Route access
 - [ ] Test route connectivity from external network
 - [ ] Verify TLS certificate is valid (or document self-signed warning)
-- [ ] Add route URL to deployment verification section
+- [ ] Add route URL retrieval to deployment verification section
