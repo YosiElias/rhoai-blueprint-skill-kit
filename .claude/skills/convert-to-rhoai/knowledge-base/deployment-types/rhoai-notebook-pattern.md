@@ -12,6 +12,12 @@ source_examples:
     source_repo: "https://github.com/NVIDIA-BioNeMo-blueprints/generative-protein-binder-design"
     fork_repo: "https://github.com/rh-ai-quickstart/generative-protein-binder-design"
     notes: "DEPLOYMENT_MODE environment variable pattern for switching between localhost and Kubernetes DNS names, with connection keepalive thread"
+    approach: "A"
+  - blueprint: "nvidia-demo"
+    source_repo: "https://github.com/crewAIInc/nvidia-demo"
+    fork_repo: "https://github.com/rh-ai-quickstart/nvidia-demo"
+    notes: "Standard workbench approach - no custom Dockerfile needed, OPENSHIFT_MODE in notebook cells to switch between NVIDIA API Catalog and self-hosted NIMs"
+    approach: "B"
 ---
 
 # RHOAI Notebook Deployment Pattern
@@ -626,8 +632,267 @@ if DEPLOYMENT_MODE == 'openshift':
 - [ ] GPU is accessible (if required)
 - [ ] Application runs without permission errors
 
+---
+
+## Approach B: Standard Workbench (No Custom Image) - from nvidia-demo
+
+### When to Use
+
+Use this approach when:
+- Blueprint doesn't require custom system dependencies or GPU drivers
+- Can run in standard RHOAI workbench images (e.g., Jupyter Minimal Python)
+- Only needs Python package installation
+- Switches between external APIs (NVIDIA API Catalog) and self-hosted services (NIMs)
+- No special entrypoint logic needed
+
+**Don't use this approach when:**
+- Need custom system packages (e.g., Xvfb, CUDA drivers)
+- Need to modify entrypoint or startup sequence
+- Need to bake data files into the image
+- Require specific base images (e.g., Isaac Lab, BioNeMo)
+
+### Differences from Approach A
+
+| Aspect | Approach A (Custom Image) | Approach B (Standard Workbench) |
+|--------|---------------------------|--------------------------------|
+| **Base Image** | Custom Dockerfile extending NVIDIA images | Standard RHOAI workbench image |
+| **Dependencies** | Baked into image at build time | Installed at runtime via pip |
+| **OPENSHIFT_MODE** | Set in Dockerfile ENV | Set in workbench environment variables |
+| **Entrypoint** | Custom launch.sh with PVC initialization | Standard Jupyter Lab (no custom script) |
+| **Deployment** | BuildConfig + ImageStream | Just create workbench and run notebook |
+| **Complexity** | Higher - requires build/deploy scripts | Lower - no build step needed |
+| **Use Cases** | Complex environments (GPU drivers, system deps) | Pure Python workflows |
+
+### Conversion Steps
+
+#### 1. Identify OPENSHIFT_MODE Usage
+
+Add environment detection at the top of the notebook:
+
+```python
+import os
+
+# Detect deployment mode
+OPENSHIFT_MODE = os.getenv('OPENSHIFT_MODE', 'false').lower() == 'true'
+
+if OPENSHIFT_MODE:
+    print("🔧 OpenShift Mode: Enabled (self-hosted NVIDIA NIMs)")
+else:
+    print("🌐 Standard Mode: Using NVIDIA API Catalog")
+```
+
+#### 2. Add Dependency Installation
+
+Install dependencies conditionally based on mode:
+
+```python
+# Install dependencies
+loader = LoadingAnimation()  # Optional: visual feedback
+loader.start("Installing")
+
+if OPENSHIFT_MODE:
+    # RHOAI-specific dependencies
+    %pip install -r requirements.txt pysqlite3-binary>=0.5.4 -q
+else:
+    # Standard dependencies
+    %pip install -r requirements.txt -q
+
+loader.stop("Installation complete")
+```
+
+**Common RHOAI-specific dependencies:**
+- `pysqlite3-binary` - SQLite compatibility for ChromaDB (see [chromadb-on-rhoai.md](../components/chromadb-on-rhoai.md))
+
+#### 3. Add Environment Variable Collection
+
+Prompt for configuration if not pre-set:
+
+```python
+import getpass
+
+if OPENSHIFT_MODE:
+    # Self-hosted NIM endpoints
+    if not os.environ.get("OPENAI_API_BASE"):
+        endpoint = input("Enter self-hosted NIM endpoint (e.g., https://llama-project.apps.cluster.com/v1): ")
+        os.environ["OPENAI_API_BASE"] = endpoint
+    
+    if not os.environ.get("OPENAI_API_KEY"):
+        nim_token = getpass.getpass("Enter NIM token: ")
+        os.environ["OPENAI_API_KEY"] = nim_token
+else:
+    # API Catalog key
+    if not os.environ.get("NVIDIA_NIM_API_KEY", "").startswith("nvapi-"):
+        nvapi_key = getpass.getpass("Enter NVIDIA API key: ")
+        os.environ["NVIDIA_NIM_API_KEY"] = nvapi_key
+```
+
+#### 4. Modify Service Configuration
+
+Switch service endpoints based on mode:
+
+**For LLM services (e.g., CrewAI):**
+```python
+from crewai import LLM
+
+if OPENSHIFT_MODE:
+    llm = LLM(
+        model="openai/meta/llama-3.1-8b-instruct",
+        base_url=os.getenv('OPENAI_API_BASE'),
+        api_key=os.getenv('OPENAI_API_KEY')
+    )
+else:
+    llm = LLM(model="nvidia_nim/meta/llama-3.3-70b-instruct")
+```
+
+**For embeddings:**
+```python
+if OPENSHIFT_MODE:
+    embedder_config = dict(
+        provider="openai",
+        config=dict(
+            model="nvidia/nv-embedqa-e5-v5-passage",
+            api_base=os.environ.get("NVIDIA_EMBED_BASE_URL"),
+            api_key=os.environ.get("NVIDIA_EMBED_TOKEN")
+        )
+    )
+else:
+    embedder_config = dict(
+        provider="nvidia",
+        config=dict(model="nvidia/nv-embedqa-e5-v5")
+    )
+```
+
+See [components/crewai-on-rhoai.md](../components/crewai-on-rhoai.md) for detailed CrewAI patterns.
+
+#### 5. Update README
+
+Add RHOAI deployment section:
+
+```markdown
+## Self-Hosted Deployment on RHOAI
+
+On **OpenShift AI**, work through your **data science project** in this order: 
+**deploy the LLM and embedding NIMs** (Part 1) → **create a workbench** and set 
+environment variables (Part 2) → **start the workbench** → **clone this repository** 
+into the workspace → **open and run** `<notebook>.ipynb`.
+
+### Part 1: Deploy NVIDIA NIMs
+
+In a project with **NVIDIA NIM** enabled and sufficient **GPU**:
+
+1. **LLM deployment**: 
+   - Models → NVIDIA NIM → Deploy model → `meta/llama-3.1-8b-instruct`
+   - Resources: 1 GPU, 16GiB memory, 4 CPU
+   - Enable token auth
+   - Copy inference URL (`/v1` endpoint) → `OPENAI_API_BASE`
+   - Copy token → `OPENAI_API_KEY`
+
+2. **Embedding NIM**:
+   - Deploy `nvidia/nv-embedqa-e5-v5`
+   - Same resources as LLM
+   - Copy URL → `NVIDIA_EMBED_BASE_URL`
+   - Copy token → `NVIDIA_EMBED_TOKEN`
+
+### Part 2: Workbench Setup
+
+1. **Create workbench** in the project:
+   - Image: Jupyter Minimal Python 3.12 (or similar)
+   - Container size: Small
+   - Accelerator: None (NIMs use GPUs, notebook doesn't)
+   
+2. **Add environment variables**:
+
+   | Variable | Value |
+   |----------|-------|
+   | `OPENSHIFT_MODE` | `true` |
+   | `OPENAI_API_BASE` | `https://your-llm-endpoint/v1` |
+   | `OPENAI_API_KEY` | `your_llm_token` |
+   | `NVIDIA_EMBED_BASE_URL` | `https://your-embed-endpoint/v1` |
+   | `NVIDIA_EMBED_TOKEN` | `your_embed_token` |
+
+3. **Start workbench**, clone repo, open notebook, run cells.
+```
+
+### Known Issues (Approach B Specific)
+
+#### Issue: "SQLite version too old" when using ChromaDB
+
+**Solution:** Apply SQLite compatibility patch (see [chromadb-on-rhoai.md](../components/chromadb-on-rhoai.md)):
+
+```python
+if OPENSHIFT_MODE:
+    import sys
+    __import__('pysqlite3')
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+```
+
+#### Issue: Notebook cells not prompting for credentials
+
+**Cause:** Environment variables already set in workbench but values are wrong.
+
+**Solution:** 
+1. Edit workbench → Environment variables
+2. Update values
+3. Restart workbench
+4. Alternatively, override in notebook:
+   ```python
+   os.environ["OPENAI_API_BASE"] = "https://correct-endpoint/v1"
+   ```
+
+#### Issue: Import errors for packages
+
+**Cause:** Dependencies not installed in workbench.
+
+**Solution:** 
+1. Ensure pip install cell runs successfully
+2. Check for errors in pip output
+3. Restart kernel if needed
+4. Manually install if needed: `!pip install <package>`
+
+---
+
+## Choosing Between Approaches
+
+### Use Approach A (Custom Image) when:
+- Blueprint requires system dependencies (Xvfb, custom drivers, system libraries)
+- Blueprint extends specific NVIDIA base images (Isaac Lab, BioNeMo)
+- Need to bake large datasets into the image
+- Need custom entrypoint logic (PVC initialization, service startup)
+- Blueprint architecture requires specific runtime environment
+
+**Examples:**
+- Isaac Lab blueprints (need GPU drivers, Xvfb, Isaac Sim)
+- BioNeMo blueprints (need specific base images)
+- Blueprints with large pre-installed datasets
+
+### Use Approach B (Standard Workbench) when:
+- Blueprint is pure Python (no system dependencies)
+- Can run in standard Jupyter environments
+- Only switches between API endpoints (NVIDIA API Catalog vs self-hosted NIMs)
+- Minimal setup required
+- Primarily notebook-based interaction
+
+**Examples:**
+- CrewAI agentic workflows (nvidia-demo)
+- Pure Python ML/AI workflows
+- API-based blueprints without local services
+
+### Decision Tree
+
+```
+Does blueprint require custom system packages or GPU drivers?
+├─ YES → Use Approach A (Custom Image)
+└─ NO → Does blueprint need specific NVIDIA base images?
+         ├─ YES → Use Approach A (Custom Image)
+         └─ NO → Can it run in standard Python environment?
+                  ├─ YES → Use Approach B (Standard Workbench)
+                  └─ NO → Use Approach A (Custom Image)
+```
+
 ## Related Patterns
 
-- [components/isaac-lab-on-rhoai.md](../components/isaac-lab-on-rhoai.md) - Example implementation
+- [components/isaac-lab-on-rhoai.md](../components/isaac-lab-on-rhoai.md) - Example Approach A implementation
+- [components/crewai-on-rhoai.md](../components/crewai-on-rhoai.md) - Example Approach B implementation
+- [components/chromadb-on-rhoai.md](../components/chromadb-on-rhoai.md) - SQLite compatibility (Approach B)
 - [resource-patterns/gpu-allocation-openshift.md](../resource-patterns/gpu-allocation-openshift.md) - GPU configuration
 - [resource-patterns/security-contexts-scc.md](../resource-patterns/security-contexts-scc.md) - Security contexts
