@@ -94,7 +94,7 @@ blueprint_features = {
 
 ### Phase 2: Knowledge Retrieval
 
-**Read `retrieval-algorithm.md` before continuing** to understand scoring logic.
+**Think like an engineer leveraging previous work**: Load knowledge files that match what you discovered about this blueprint. Don't load everything—that creates noise. Don't load too little—you'd miss proven patterns.
 
 #### 2.1 Scan Knowledge Base
 
@@ -103,26 +103,49 @@ KB_DIR=".claude/skills/convert-to-rhoai/knowledge-base"
 find "$KB_DIR" -name "*.md" -not -name "README.md" -type f
 ```
 
-#### 2.2 Score and Load Relevant Knowledge
+#### 2.2 Load Relevant Knowledge
 
-For each knowledge file:
-1. Extract frontmatter only: `awk 'n==2{exit} /^---$/{n++} n' <file>`
-2. Score using algorithm from `retrieval-algorithm.md`:
-   - Component matches: +10 points each
-   - Architecture match: +5 points
-   - Deployment type matches: +4 points each
-   - Resource type matches: +2 points each
-3. Load full content for top 10 files (score > 0)
-4. Keep in context for reasoning phase
+**Check frontmatter for relevance**: Each knowledge file has frontmatter with tags (`components`, `architecture`, `deployment_types`, `resource_types`, `source_examples`). 
 
-**Important**: Do NOT load all knowledge files upfront - only top-scored relevant ones.
+Extract frontmatter efficiently (without reading full file):
+```bash
+# Extract only frontmatter
+awk 'n==2{exit} /^---$/{n++} n' <knowledge-file.md>
+```
+
+Use frontmatter to assess which files are relevant before loading full content.
+
+Based on your blueprint analysis, load knowledge files across these dimensions:
+
+**Components** (highest priority): Files for the specific components you identified
+- Example: Blueprint uses Triton, Milvus, Redis → load those component files
+- `knowledge-base/components/triton-on-rhoai.md`
+- `knowledge-base/components/milvus-on-rhoai.md`
+- `knowledge-base/components/redis-on-rhoai.md`
+
+**Deployment types**: Files matching the deployment structure
+- Example: Helm-based blueprint → load `knowledge-base/deployment-types/helm-conditional-support.md`
+
+**Architecture**: If there's a clear pattern match
+- Example: RAG pipeline → load `knowledge-base/architectures/rag-pipeline-pattern.md`
+
+**Resource patterns**: Files for specific concerns you identified
+- Example: GPU needed → load `knowledge-base/resource-patterns/gpu-allocation-openshift.md`
+- Example: Storage volumes → load `knowledge-base/resource-patterns/storage-pvc-patterns.md`
+
+**Integration patterns**: If multiple components need special integration
+- Example: Triton + Milvus → check `knowledge-base/integrations/triton-milvus-integration.md`
+
+**Guideline**: Load 5-10 most relevant files initially. You can retrieve more during reasoning if specific questions emerge.
+
+**Important**: Do NOT load all knowledge files upfront—only what's relevant to THIS blueprint.
 
 #### 2.3 On-Demand Retrieval
 
-During reasoning, if questions arise about components not in top 10:
-- Score the specific component's knowledge file
-- Load it if relevant (score > 0)
-- Apply pattern
+During reasoning, if questions arise about components not initially loaded:
+- Check if a relevant knowledge file exists
+- Load it if it applies to this blueprint
+- Apply the pattern
 
 ---
 
@@ -407,7 +430,6 @@ Print comprehensive summary using Conversion Summary Report template from `outpu
 ## Supporting Documents
 
 - `reasoning-guardrails.md`: Concern areas to check during reasoning - **Read at Phase 3**
-- `retrieval-algorithm.md`: How knowledge files are scored and loaded - **Read at Phase 2**
 - `output-templates.md`: Templates for TEST-PLAN, RHOAI-CONVERSION, summary - **Read at Phase 6-7**
 - `knowledge-base/README.md`: Knowledge base structure and usage
 
@@ -426,7 +448,7 @@ Read these documents at the appropriate phase boundaries as instructed above ("b
 - ✅ Check guardrails coverage before completing
 
 ### DON'T:
-- ❌ Load all knowledge upfront (only top 10 relevant)
+- ❌ Load all knowledge upfront (only load what's relevant)
 - ❌ Create new files when editing existing would work
 - ❌ Modify without conditional RHOAI mode toggles
 - ❌ Skip user decisions on model deployment strategy
