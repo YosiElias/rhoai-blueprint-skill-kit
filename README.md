@@ -6,8 +6,8 @@ Claude Code skills for converting NVIDIA AI Blueprints to Red Hat OpenShift AI (
 
 This repository provides two complementary skills:
 
-1. **Knowledge Extraction** (`extract-blueprint-knowledge`) - Extract reusable patterns from completed RHOAI conversions
-2. **Blueprint Conversion** (`convert-to-rhoai`) - Apply proven patterns to convert new blueprints to RHOAI
+1. **Knowledge Extraction** (`bp-extract-blueprint-knowledge`) - Extract reusable patterns from completed RHOAI conversions
+2. **Blueprint Conversion** (`bp-convert-to-rhoai`) - Apply proven patterns to convert new blueprints to RHOAI
 
 ## How It Works
 
@@ -15,9 +15,9 @@ This repository provides two complementary skills:
 
 Instead of hardcoding conversion logic, these skills use a **knowledge base** built from your team's actual RHOAI conversions:
 
-1. **Extract patterns** from completed conversions using `/extract-blueprint-knowledge`
+1. **Extract patterns** from completed conversions using `/bp-extract-blueprint-knowledge`
 2. **Build knowledge base** with atomic, reusable component patterns
-3. **Apply patterns** automatically when converting new blueprints with `/convert-to-rhoai`
+3. **Apply patterns** automatically when converting new blueprints with `/bp-convert-to-rhoai`
 4. **Learn continuously** - each new conversion adds to the knowledge base
 
 ### Key Features
@@ -49,14 +49,14 @@ cd claude-skill-for-nvidia-blueprint-to-helm
 claude
 
 # Extract knowledge from a completed RHOAI blueprint
-/extract-blueprint-knowledge --source https://github.com/NVIDIA-AI-Blueprints/nv-ingest-rag --fork https://github.com/your-org/nv-ingest-rag-rhoai
+/bp-extract-blueprint-knowledge --source https://github.com/NVIDIA-AI-Blueprints/nv-ingest-rag --fork https://github.com/your-org/nv-ingest-rag-rhoai
 ```
 
 The skill will:
 - Clone the repository
 - Analyze RHOAI-specific commits
 - Extract component patterns (Redis, Triton, Milvus, etc.)
-- Generate knowledge files in `convert-to-rhoai/knowledge-base/`
+- Generate knowledge files in `bp-convert-to-rhoai/knowledge-base/`
 
 **Review and refine** the generated knowledge files before using them.
 
@@ -75,7 +75,7 @@ cd some-blueprint
 claude
 
 # Convert the blueprint
-/convert-to-rhoai .
+/bp-convert-to-rhoai .
 ```
 
 The skill will:
@@ -160,12 +160,13 @@ claude-skill-for-nvidia-blueprint-to-helm/
 ├── README.md (this file)
 ├── .claude/
 │   └── skills/
-│       ├── extract-blueprint-knowledge/
+│       ├── bp-extract-blueprint-knowledge/
 │       │   └── SKILL.md                    # Knowledge extraction skill
-│       └── convert-to-rhoai/
+│       └── bp-convert-to-rhoai/
 │           ├── SKILL.md                    # Blueprint conversion skill
 │           ├── reasoning-guardrails.md     # Concern areas to check
-│           ├── retrieval-algorithm.md      # Knowledge scoring logic
+│           ├── output-templates.md         # Output templates
+│           ├── subagent-validation-prompt.md  # Validation instructions
 │           └── knowledge-base/             # Extracted patterns
 │               ├── README.md               # Knowledge base guide
 │               ├── components/             # Component-specific patterns
@@ -209,19 +210,19 @@ The knowledge base organizes patterns into atomic, reusable files:
 claude
 
 # Extract from first blueprint
-/extract-blueprint-knowledge --source https://github.com/NVIDIA-AI-Blueprints/nv-ingest-rag --fork https://github.com/your-org/nv-ingest-rag-rhoai
+/bp-extract-blueprint-knowledge --source https://github.com/NVIDIA-AI-Blueprints/nv-ingest-rag --fork https://github.com/your-org/nv-ingest-rag-rhoai
 
 # Review generated knowledge files
-cat .claude/skills/convert-to-rhoai/knowledge-base/components/redis-on-rhoai.md
+cat .claude/skills/bp-convert-to-rhoai/knowledge-base/components/redis-on-rhoai.md
 
 # Extract from second blueprint (adds to or updates existing knowledge)
-/extract-blueprint-knowledge --source https://github.com/NVIDIA-AI-Blueprints/video-search --fork https://github.com/your-org/video-search-rhoai
+/bp-extract-blueprint-knowledge --source https://github.com/NVIDIA-AI-Blueprints/video-search --fork https://github.com/your-org/video-search-rhoai
 
 # Review updated/new knowledge
 # Notice: if both used Redis, redis-on-rhoai.md now has "Approach A" and "Approach B"
 
 # Extract from third blueprint
-/extract-blueprint-knowledge --source https://github.com/NVIDIA-AI-Blueprints/agent-studio --fork https://github.com/your-org/agent-studio-rhoai
+/bp-extract-blueprint-knowledge --source https://github.com/NVIDIA-AI-Blueprints/agent-studio --fork https://github.com/your-org/agent-studio-rhoai
 ```
 
 ### Example 2: Converting RAG Pipeline Blueprint
@@ -234,7 +235,7 @@ cd rag-chatbot
 claude
 
 # Start conversion
-/convert-to-rhoai .
+/bp-convert-to-rhoai .
 ```
 
 **Conversion flow:**
@@ -252,7 +253,7 @@ git clone https://github.com/NVIDIA-AI-Blueprints/jupyter-inference
 cd jupyter-inference
 
 claude
-/convert-to-rhoai .
+/bp-convert-to-rhoai .
 ```
 
 **Conversion flow:**

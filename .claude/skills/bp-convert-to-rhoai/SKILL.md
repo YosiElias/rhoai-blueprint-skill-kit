@@ -1,5 +1,5 @@
 ---
-name: convert-to-rhoai
+name: bp-convert-to-rhoai
 description: Convert an NVIDIA Blueprint to RHOAI-compatible version using proven patterns
 argument-hint: <path-to-blueprint-directory>
 allowed-tools: Bash, Read, Write, Edit, Agent, mcp__plugin_context7_context7__query-docs, mcp__plugin_context7_context7__resolve-library-id, AskUserQuestion
@@ -99,7 +99,7 @@ blueprint_features = {
 #### 2.1 Scan Knowledge Base
 
 ```bash
-KB_DIR=".claude/skills/convert-to-rhoai/knowledge-base"
+KB_DIR=".claude/skills/bp-convert-to-rhoai/knowledge-base"
 find "$KB_DIR" -name "*.md" -not -name "README.md" -type f
 ```
 
@@ -446,7 +446,7 @@ Agent(
     description="Validate RHOAI conversion outputs",
     prompt=f"""
 Read and follow validation instructions from:
-.claude/skills/convert-to-rhoai/subagent-validation-prompt.md
+.claude/skills/bp-convert-to-rhoai/subagent-validation-prompt.md
 
 **Validation context:**
 - Blueprint directory: {blueprint_dir}

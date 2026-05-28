@@ -4,7 +4,7 @@ This directory contains reusable patterns extracted from successfully completed 
 
 ## Purpose
 
-The knowledge base enables the `convert-to-rhoai` skill to:
+The knowledge base enables the `bp-convert-to-rhoai` skill to:
 - Apply proven conversion patterns to new blueprints
 - Avoid reinventing solutions for common components
 - Maintain consistency across conversions
@@ -51,7 +51,7 @@ source_examples:
 Use the extraction skill on completed RHOAI blueprints:
 
 ```bash
-/extract-blueprint-knowledge https://github.com/your-org/blueprint-rhoai
+/bp-extract-blueprint-knowledge https://github.com/your-org/blueprint-rhoai
 ```
 
 The skill will:
@@ -157,7 +157,7 @@ Use lowercase with hyphens, no underscores or spaces.
 
 ## Using Knowledge in Conversions
 
-The `convert-to-rhoai` skill automatically:
+The `bp-convert-to-rhoai` skill automatically:
 1. Analyzes the new blueprint
 2. Scores knowledge files by relevance (tag matching)
 3. Loads top-scored knowledge

@@ -1,5 +1,5 @@
 ---
-name: extract-blueprint-knowledge
+name: bp-extract-blueprint-knowledge
 description: Extract RHOAI conversion patterns from a completed blueprint and generate knowledge base files
 argument-hint: --source <original-nvidia-blueprint-url> --fork <rhoai-fork-url>
 allowed-tools: Bash, Read, Write, Edit, WebFetch, Agent
@@ -11,7 +11,7 @@ You are extracting reusable RHOAI conversion patterns from an already-completed 
 
 ## Goal
 
-Generate atomic, reusable knowledge files that capture how components were adapted for RHOAI. These knowledge files will be used by the `convert-to-rhoai` skill to automatically apply proven patterns to new blueprints.
+Generate atomic, reusable knowledge files that capture how components were adapted for RHOAI. These knowledge files will be used by the `bp-convert-to-rhoai` skill to automatically apply proven patterns to new blueprints.
 
 ## Input
 
@@ -241,12 +241,12 @@ grep -r "kind: Ingress" . --include="*.yaml" -A 10
 
 ### Step 7: Generate Knowledge Files
 
-**Target directory:** `../convert-to-rhoai/knowledge-base/`
+**Target directory:** `../bp-convert-to-rhoai/knowledge-base/`
 
 For each component, determine if knowledge file already exists:
 
 ```bash
-KNOWLEDGE_BASE="../convert-to-rhoai/knowledge-base"
+KNOWLEDGE_BASE="../bp-convert-to-rhoai/knowledge-base"
 COMPONENT_NAME="redis"  # example
 KNOWLEDGE_FILE="$KNOWLEDGE_BASE/components/${COMPONENT_NAME}-on-rhoai.md"
 
@@ -599,7 +599,7 @@ If extraction fails or is uncertain:
 
 All knowledge files go to:
 ```
-.claude/skills/convert-to-rhoai/knowledge-base/
+.claude/skills/bp-convert-to-rhoai/knowledge-base/
 ├── components/
 ├── architectures/
 ├── deployment-types/
