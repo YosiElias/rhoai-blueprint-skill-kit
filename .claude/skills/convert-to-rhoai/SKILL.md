@@ -282,11 +282,34 @@ Do you have these resources available in your OpenShift cluster?
 - No, prefer NVIDIA hosted models via API"
 ```
 
+#### 4.4 Cluster Storage and Configuration
+
+If blueprint requires shared storage (PVC with RWM access mode) or has cluster-specific configuration needs:
+
+```
+"This blueprint uses/may benefit from ReadWriteMany (RWM) Persistent Volume Claims for:
+- <component> - <reason> (Required/Optional)
+- ...
+
+Does your OpenShift cluster have RWM storage class available (e.g., NFS, CephFS, GlusterFS)?
+- Yes, I have RWM storage available
+- No, only RWO (ReadWriteOnce) storage available
+- Not sure, need to check"
+
+[If other cluster-specific questions arise during analysis:]
+"Additional cluster configuration questions:
+- <question-about-ingress/networking/security/etc>
+- <question-about-available-operators/capabilities>
+- ..."
+```
+
 **When to ask:**
 - Multiple valid approaches exist in knowledge base
 - Decision depends on user's environment (cluster, policies, resources)
 - Model deployment strategy needed
 - Knowledge base doesn't indicate clear preference
+- Blueprint requires or could benefit from RWM storage
+- Cluster-specific capabilities needed (ingress, networking, security policies, available operators)
 
 ---
 
